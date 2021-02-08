@@ -5,6 +5,7 @@ import textwrap
 import warnings
 
 import pymongo.errors
+import typing
 
 from aiomongodel.errors import DocumentNotFoundError, DuplicateKeyError
 
@@ -261,17 +262,13 @@ class MotorQuerySetCursor(object):
         getattr(self.cursor, method)(*args, *kwargs)
         return self
 
-    async def to_list(self, length):
-        """Return list of documents.
+    async def to_list(self, length: int) -> typing.AsyncIterator['Document']:
+        for item in await self.cursor.to_list(length):
+            yield self.doc_class.from_mongo(item)
 
-        Args:
-            length: Number of items to return.
-
-        Returns:
-            list: List of document model instances.
-        """
-        data = await self.cursor.to_list(length)
-        return [self.doc_class.from_mongo(item) for item in data]
+    async def to_pydantic_list(self, page_size: int, page_number: int) -> typing.List['BaseModel']:
+        cursor = self.skip(max(0, page_number - 1 * page_size)).limit(page_size)
+        return [item.to_pydantic() async for item in cursor]
 
     def clone(self):
         """Get copy of this cursor."""

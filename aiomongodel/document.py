@@ -2,12 +2,13 @@
 import contextlib
 import warnings
 from collections import OrderedDict
+from copy import deepcopy
 
 from bson import ObjectId, SON
 
 from aiomongodel.errors import ValidationError
 from aiomongodel.queryset import MotorQuerySet
-from aiomongodel.fields import Field, ObjectIdField, SynonymField, _Empty
+from aiomongodel.fields import Field, ObjectIdField, SynonymField, _Empty, ListField
 from aiomongodel.utils import snake_case
 
 
@@ -235,8 +236,22 @@ class BaseDocument(object):
         Returns:
             OrderedDict: Data of the document.
         """
-        # TODO: Add recursive parameter
-        return self._data
+
+        data = deepcopy(self._data)
+
+        for item_name, item_value in self._data.items():
+            if isinstance(item_value, BaseDocument):
+                data[item_name] = item_value.to_data()
+            elif isinstance(item_value, list):
+                data_list = []
+                for item in item_value:
+                    if isinstance(item, BaseDocument):
+                        data_list.append(item.to_data())
+                    else:
+                        data_list.append(item)
+                data[item_name] = data_list
+
+        return data
 
     def _get_field_value_from_data(self, data, field_name):
         """Retrieve value from data for given field_name.
